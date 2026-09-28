@@ -16,17 +16,51 @@ A simple, accessible **Todo List** web app built with **React 19** and **Vite 8*
 - ♿ Keyboard accessible, labelled controls, live regions for status messages
 - 📱 Responsive down to small phone widths
 
+## Package manager: npm
+
+This project uses **npm**, declared in the `devEngines` field of `package.json`.
+npm honours that field, and other managers that understand `devEngines` (pnpm,
+Yarn) will refuse to install here — so please don't mix managers in this repo.
+
+| Task                                                     | Command                  |
+| -------------------------------------------------------- | ------------------------ |
+| Install exactly what the lockfile pins (fresh clone, CI)  | `npm ci`                 |
+| Install / refresh dependencies                            | `npm install`            |
+| Add a runtime dependency                                  | `npm install <pkg>`      |
+| Add a dev dependency                                      | `npm install -D <pkg>`   |
+| Remove a dependency                                       | `npm uninstall <pkg>`    |
+
+> **Commit `package-lock.json`.** It is not in the repo yet because this project was
+> scaffolded by hand on a machine with no Node.js installed. Run `npm install` once to
+> generate it, then commit it — the lockfile is what makes installs reproducible for
+> everyone (and what deployment platforms read to pick npm). `.gitignore` only ignores
+> `node_modules`, so the lockfile stays tracked.
+
 ## Requirements
 
-- **Node.js `^20.19.0 || >=22.12.0`** (required by Vite 8)
-- npm (bundled with Node.js)
+- **Node.js `^20.19.0 || >=22.12.0`** — required by Vite 8
+- **npm 10 or newer** — ships with every supported Node.js version
 
-Check what you have with `node -v` and `npm -v`.
+```bash
+node -v   # check Node
+npm -v    # check npm
+```
+
+No Node.js yet? Installing it gives you npm too:
+
+```powershell
+winget install OpenJS.NodeJS.LTS   # Windows
+```
+
+```bash
+brew install node                  # macOS (Homebrew)
+sudo apt install nodejs npm        # Debian / Ubuntu
+```
 
 ## Getting started
 
 ```bash
-# 1. install dependencies
+# 1. install dependencies (also creates package-lock.json)
 npm install
 
 # 2. start the dev server (opens http://localhost:5173)
@@ -79,6 +113,7 @@ npm run dev
 `npm run build` produces a static `dist/` folder that can be deployed to any static
 host (Vercel, Netlify, GitHub Pages, etc.).
 
+- **Install command:** `npm ci` (uses the committed `package-lock.json`)
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
 - **Local data:** tasks are stored per-browser in `localStorage`, so they are not
