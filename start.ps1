@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $project = $PSScriptRoot
 
 # Use the standard Node.js install folder even if this PowerShell window has an old PATH.
@@ -14,11 +14,11 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not (Get-Command 
     exit 1
 }
 
-Push-Location (Join-Path $project 'frontend')
+Push-Location $project
 try {
     if (-not (Test-Path 'node_modules')) {
-        Write-Host 'First run: downloading the website packages. Please wait...'
-        npm.cmd install
+        Write-Host 'First run: installing the website packages. Please wait...'
+        npm.cmd ci
         if ($LASTEXITCODE -ne 0) { throw 'Package installation failed. Check your internet connection and try again.' }
     }
     Write-Host ''
