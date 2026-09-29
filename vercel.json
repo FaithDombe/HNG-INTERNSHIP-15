@@ -6,7 +6,7 @@
       "framework": "vite"
     },
     "frontend": {
-      "root": "codex app/frontend",
+      "root": "codex app",
       "framework": "vite"
     }
   },
