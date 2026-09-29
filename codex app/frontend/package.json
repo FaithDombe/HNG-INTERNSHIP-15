@@ -7,11 +7,10 @@
     "dev": "vite",
     "build": "vite build"
   },
+  "devDependencies": {},
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest"
-  },
-  "devDependencies": {}
+  }
 }

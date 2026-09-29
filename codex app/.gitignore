@@ -1,12 +1,10 @@
-# Installed packages and local Python environment
+# Installed dependencies and generated build output
 frontend/node_modules/
-backend/.venv/
-
-# Local database and generated frontend output
-backend/todos.db
-backend/todos.db-*
 frontend/dist/
 
-# Python cache files
+# Local task data backup (never upload)
+local-data/
+
+# Python cache files from any local tooling
 __pycache__/
 *.py[cod]

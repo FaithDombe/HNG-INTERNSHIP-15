@@ -1,25 +1,26 @@
 # Little List
 
-A beginner-friendly todo app: React in the browser, a Python FastAPI API, and SQLite for storage. Tasks support notes, editing, completion, reordering, and deletion.
+A simple React todo list with notes, editing, completion, reordering, and deletion.
 
 ## Run it on Windows
 
-1. Install Python 3.10 or newer and Node.js LTS.
+1. Install Node.js LTS if it is not installed already.
 2. Open this folder in File Explorer and double-click `start.ps1`.
-3. The first run installs the app packages. Keep the server windows open while using the app.
-4. The app opens at http://localhost:5173.
+3. Keep the PowerShell window open, then open http://localhost:5173 in your browser.
+4. To stop the app, click the PowerShell window and press Ctrl+C.
 
-If PowerShell says running scripts is disabled, in the same PowerShell window run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then run `./start.ps1`.
+If Windows says running scripts is disabled, open PowerShell in this folder, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then run `./start.ps1`.
 
-Tasks are saved in `backend/todos.db` on this computer. API documentation is at http://localhost:8000/docs.
+## Where tasks are saved
 
-## Publish a public demo on Render
+Tasks are saved in this browser on this computer. They stay after you refresh the page, but they do not sync to another browser or device. Clearing this browser's site data removes them. The React app does not need a Python server or database.
 
-The repository includes a Dockerfile that builds the React site and runs it with the FastAPI server.
+## Publish the React app
 
-1. Sign in to Render using the GitHub account that can access `FaithDombe/HNG-INTERNSHIP-15`.
-2. Choose **New +** > **Web Service**, then connect that repository.
-3. Set **Root Directory** to `codex app` and **Runtime** to Docker. Select the Free plan for a demonstration.
-4. Create the web service. When the deploy finishes, Render shows the public URL at the top of its page.
+The `frontend` folder is a static Vite website, so it can be hosted by Vercel or Netlify without a Python server.
 
-This demo has no sign-in: anyone with the URL can view and change the same list. The free service's SQLite file is temporary and may be erased when the service restarts or redeploys. Do not use it for private or important tasks. Keeping SQLite data between restarts requires a paid persistent disk.
+1. Push this project to GitHub.
+2. In Vercel or Netlify, create a new site from the GitHub repository.
+3. Set the project/base directory to `codex app/frontend`.
+4. Set the build command to `npm run build` and the output directory to `dist`.
+5. Deploy. Each visitor will have their own separate task list saved in their browser.
