@@ -13,10 +13,13 @@ If PowerShell says running scripts is disabled, in the same PowerShell window ru
 
 Tasks are saved in `backend/todos.db` on this computer. API documentation is at http://localhost:8000/docs.
 
-## Public hosting notes
+## Publish a public demo on Render
 
-The React production build is served by FastAPI, so one web service can host both. Build the frontend with `cd frontend && npm install && npm run build`; then start the API with `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`.
+The repository includes a Dockerfile that builds the React site and runs it with the FastAPI server.
 
-For a host such as Render, set the repository root directory to `codex app`, use the build command `cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt`, and the start command `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`. Set `TODO_DB_PATH=/var/data/todos.db` and mount a persistent disk at `/var/data` to keep the SQLite database between restarts and deployments.
+1. Sign in to Render using the GitHub account that can access `FaithDombe/HNG-INTERNSHIP-15`.
+2. Choose **New +** > **Web Service**, then connect that repository.
+3. Set **Root Directory** to `codex app` and **Runtime** to Docker. Select the Free plan for a demonstration.
+4. Create the web service. When the deploy finishes, Render shows the public URL at the top of its page.
 
-The current app has no sign-in: a public deployment would give every visitor access to the same tasks and notes. Add authentication before putting private information in it. Render's free web services do not preserve SQLite files; persistent disks require a paid web service.
+This demo has no sign-in: anyone with the URL can view and change the same list. The free service's SQLite file is temporary and may be erased when the service restarts or redeploys. Do not use it for private or important tasks. Keeping SQLite data between restarts requires a paid persistent disk.
