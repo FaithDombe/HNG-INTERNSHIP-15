@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'little-list-todos';
+const STARTER_SUBTASKS = ['First step', 'Second step', 'Third step', 'Final step'];
+
+function normalizeTodo(todo) {
+  const subtasks = Array.isArray(todo.subtasks) ? todo.subtasks : [];
+  return {
+    ...todo,
+    subtasks: [
+      ...subtasks.map((subtask, index) => ({
+        id: subtask.id || `${todo.id}-subtask-${index}`,
+        title: typeof subtask.title === 'string' ? subtask.title : '',
+        completed: Boolean(subtask.completed),
+      })),
+      ...STARTER_SUBTASKS.slice(subtasks.length).map((title, index) => ({
+        id: `${todo.id}-starter-${index}`,
+        title,
+        completed: false,
+      })),
+    ],
+  };
+}
+
 function loadTodos() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(saved) ? saved : [];
+    return Array.isArray(saved) ? saved.map(normalizeTodo) : [];
   } catch {
     return [];
   }
@@ -14,6 +35,7 @@ export default function App() {
   const [todos, setTodos] = useState(loadTodos);
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
+  const [subtasks, setSubtasks] = useState(['', '', '', '']);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
 
@@ -29,14 +51,25 @@ export default function App() {
     event.preventDefault();
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
+    const cleanSubtasks = subtasks.map(item => item.trim());
+    if (cleanSubtasks.length < 4 || cleanSubtasks.some(item => !item)) {
+      setError('Add at least four subtask names before creating the task.');
+      return;
+    }
     setTodos(items => [...items, {
       id: crypto.randomUUID(),
       title: cleanTitle,
       notes: notes.trim(),
       completed: false,
+      subtasks: cleanSubtasks.map((subtask, index) => ({
+        id: `${crypto.randomUUID()}-${index}`,
+        title: subtask,
+        completed: false,
+      })),
     }]);
     setTitle('');
     setNotes('');
+    setSubtasks(['', '', '', '']);
     setError('');
   }
 
@@ -55,6 +88,14 @@ export default function App() {
   function toggle(todo) {
     setTodos(items => items.map(item => item.id === todo.id
       ? { ...item, completed: !item.completed }
+      : item));
+  }
+
+  function toggleSubtask(todo, subtask) {
+    setTodos(items => items.map(item => item.id === todo.id
+      ? { ...item, subtasks: item.subtasks.map(step => step.id === subtask.id
+        ? { ...step, completed: !step.completed }
+        : step) }
       : item));
   }
 
@@ -89,6 +130,14 @@ export default function App() {
         <button type="submit" disabled={!title.trim()}>Add task <span>{String.fromCharCode(8599)}</span></button>
         <label className="sr-only" htmlFor="new-notes">Notes (optional)</label>
         <textarea id="new-notes" className="add-notes" maxLength="5000" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add a note (optional)" rows="2" />
+        <fieldset className="new-subtasks">
+          <legend>Break it into at least 4 steps</legend>
+          {subtasks.map((subtask, index) => <label key={index}>
+            <span>{index + 1}</span>
+            <input maxLength="200" value={subtask} onChange={event => setSubtasks(items => items.map((item, i) => i === index ? event.target.value : item))} placeholder={`Subtask ${index + 1}`} required />
+          </label>)}
+          <button type="button" className="add-step" onClick={() => setSubtasks(items => [...items, ''])}>+ Add another step</button>
+        </fieldset>
       </form>
       <div className="list-top"><span>YOUR LIST</span><span className="count">{remaining} TO DO</span></div>
       {todos.length === 0 ?
@@ -103,6 +152,13 @@ export default function App() {
               <button onClick={() => move(todo, 'down')} disabled={index === todos.length - 1} aria-label="Move down" title="Move down">{String.fromCharCode(8595)}</button>
               <button className="delete" onClick={() => remove(todo)} aria-label={`Delete ${todo.title}`} title="Delete">{String.fromCharCode(215)}</button>
             </div>
+          </div>
+          <div className="subtasks" aria-label={`Subtasks for ${todo.title}`}>
+            <div className="subtask-progress">{todo.subtasks.filter(step => step.completed).length} of {todo.subtasks.length} steps complete</div>
+            {todo.subtasks.map(step => <label className={`subtask ${step.completed ? 'subtask-done' : ''}`} key={step.id}>
+              <input type="checkbox" checked={step.completed} onChange={() => toggleSubtask(todo, step)} />
+              <span>{step.title}</span>
+            </label>)}
           </div>
           {editing === todo.id && <form className="edit-form" onSubmit={event => saveEdit(event, todo)}>
             <label>Task name<input name="title" maxLength="200" defaultValue={todo.title} required /></label>
