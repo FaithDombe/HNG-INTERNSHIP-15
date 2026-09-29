@@ -1,0 +1,12 @@
+# Installed packages and local Python environment
+frontend/node_modules/
+backend/.venv/
+
+# Local database and generated frontend output
+backend/todos.db
+backend/todos.db-*
+frontend/dist/
+
+# Python cache files
+__pycache__/
+*.py[cod]
