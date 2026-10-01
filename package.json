@@ -1,5 +1,5 @@
 {
-  "name": "simple-todo-frontend",
+  "name": "internship-shop",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -14,3 +14,4 @@
     "react-dom": "latest"
   }
 }
+
