@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from './supabase.js';
 
 const products = [
   { id: 1, name: 'Everyday Rice', category: 'Groceries', price: 12500, icon: '🍚', label: 'Customer favourite', tone: 'rice' },
@@ -17,16 +18,52 @@ const categories = [
 const money = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
 
 export default function App() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('everyday-market-cart') || '[]'); }
+    catch { return []; }
+  });
   const [activeCategory, setActiveCategory] = useState('All finds');
   const [search, setSearch] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [session, setSession] = useState(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderMessage, setOrderMessage] = useState('');
+  const [orderResult, setOrderResult] = useState(null);
+  const [delivery, setDelivery] = useState({ name: '', phone: '', address: '' });
   const visibleProducts = useMemo(() => products.filter(product => {
     const matchesCategory = activeCategory === 'All finds' || product.category === activeCategory;
     const matchesSearch = `${product.name} ${product.category}`.toLowerCase().includes(search.trim().toLowerCase());
     return matchesCategory && matchesSearch;
   }), [activeCategory, search]);
+  useEffect(() => {
+    if (!accountOpen) return;
+    function closeAccountMenu(event) {
+      if (!accountRef.current?.contains(event.target)) setAccountOpen(false);
+    }
+    document.addEventListener('mousedown', closeAccountMenu);
+    return () => document.removeEventListener('mousedown', closeAccountMenu);
+  }, [accountOpen]);
+  useEffect(() => {
+    try { localStorage.setItem('everyday-market-cart', JSON.stringify(cart)); } catch { /* Browser storage may be unavailable. */ }
+  }, [cart]);
+  useEffect(() => {
+    if (!accountOpen) return;
+    function closeAccountMenu(event) {
+      if (!accountRef.current?.contains(event.target)) setAccountOpen(false);
+    }
+    document.addEventListener('mousedown', closeAccountMenu);
+    return () => document.removeEventListener('mousedown', closeAccountMenu);
+  }, [accountOpen]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    return () => subscription.unsubscribe();
+  }, []);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
 
@@ -46,12 +83,46 @@ export default function App() {
     document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
   }
 
+  async function handleSignOut() {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) setNotice(`Sign-out could not finish: ${error.message}`);
+    else { setAccountOpen(false); setNotice('You have signed out.'); }
+  }
+  async function handleGoogleSignIn() {
+    if (!supabase) { setNotice('Add your Supabase project settings before signing in.'); return; }
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) setNotice(`Sign-in could not start: ${error.message}`);
+  }
+  async function submitOrder(event) {
+    event.preventDefault();
+    if (!supabase) { setOrderMessage('Connect your Supabase project first.'); return; }
+    if (!session?.user) { setOrderMessage('Please sign in with Google before placing an order.'); return; }
+    setOrderBusy(true); setOrderMessage('');
+    try {
+      const { data: saved, error } = await supabase.from('orders').insert({
+        user_id: session.user.id,
+        customer_name: delivery.name.trim(),
+        customer_email: session.user.email,
+        customer_phone: delivery.phone.trim(),
+        shipping_address: delivery.address.trim(),
+        items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, unit_price: item.price })),
+        total: cartTotal,
+      }).select('id').single();
+      if (error) throw error;
+      const { error: emailError } = await supabase.functions.invoke('send-order-confirmation', { body: { orderId: saved.id } });
+      setCart([]);
+      setOrderResult({ id: saved.id, emailSent: !emailError });
+    } catch (error) {
+      setOrderMessage(error.message || 'We could not save the order. Please try again.');
+    } finally { setOrderBusy(false); }
+  }
   return <>
     <div className="announcement"><span>Little finds, lovely prices</span><span className="announcement-divider">✦</span><span>Welcome to Everyday Market</span></div>
     <header className="site-header">
       <a className="brand" href="#home" aria-label="Everyday Market home"><span className="brand-mark">e</span><span>everyday<span className="brand-light">market</span></span></a>
       <label className="search-box"><span aria-hidden="true">⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search for something good..." aria-label="Search products" />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>×</button>}</label>
-      <div className="header-actions"><button className="account-button" type="button" onClick={() => setNotice('Google sign-in will be connected in a later step.')}><span aria-hidden="true">♙</span><span>Account</span></button><button className="cart-button" type="button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${cartCount} items`}><span className="cart-icon" aria-hidden="true">▱</span><span className="cart-label">Cart</span><b>{cartCount}</b></button></div>
+      <div className="header-actions"><div className="account-wrap" ref={accountRef}><button className="account-button" type="button" aria-haspopup="menu" aria-expanded={Boolean(session?.user && accountOpen)} onClick={() => session?.user ? setAccountOpen(open => !open) : handleGoogleSignIn()} title={session?.user?.email ?? 'Sign in with Google'}><span aria-hidden="true">♙</span><span>{session?.user?.email ?? 'Account'}</span><span className="account-chevron" aria-hidden="true">⌄</span></button>{session?.user && accountOpen && <div className="account-menu" role="menu"><small>Signed in as</small><strong>{session.user.email}</strong><button type="button" role="menuitem" onClick={handleSignOut}>Sign out</button></div>}</div><button className="cart-button" type="button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${cartCount} items`}><span className="cart-icon" aria-hidden="true">▱</span><span className="cart-label">Cart</span><b>{cartCount}</b></button></div>
     </header>
     <nav className="category-nav" aria-label="Shop categories">{categories.map(category => <button key={category.name} className={activeCategory === category.name ? 'nav-category active' : 'nav-category'} type="button" onClick={() => chooseCategory(category.name)}><span aria-hidden="true">{category.icon}</span>{category.name}</button>)}</nav>
     <main id="home" className="storefront">
@@ -70,6 +141,12 @@ export default function App() {
     </main>
     <footer className="site-footer"><a className="brand footer-brand" href="#home"><span className="brand-mark">e</span><span>everyday<span className="brand-light">market</span></span></a><p>Good finds for everyday living.</p><div className="footer-meta"><span>Sample shop project</span><span>Made with care ✳</span><span>© 2026 Everyday Market</span></div></footer>
     {notice && <div className="toast" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss message" onClick={() => setNotice('')}>×</button></div>}
-    {cartOpen && <div className="cart-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setCartOpen(false); }}><aside className="cart-panel" aria-label="Shopping cart"><div className="cart-panel-head"><div><p className="eyebrow">YOUR LITTLE HAUL</p><h2>Your cart <span>({cartCount})</span></h2></div><button className="close-cart" type="button" aria-label="Close cart" onClick={() => setCartOpen(false)}>×</button></div>{cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">🛍️</span><h3>Your cart is waiting</h3><p>Add a few good finds and they’ll show up here.</p><button type="button" onClick={() => setCartOpen(false)}>Keep browsing</button></div> : <><div className="cart-items">{cart.map(item => <div className="cart-item" key={item.id}><div className={`cart-item-art art-${item.tone}`} aria-hidden="true">{item.icon}</div><div className="cart-item-copy"><b>{item.name}</b><span>{money.format(item.price)}</span><div className="quantity-control"><button type="button" aria-label={`Remove one ${item.name}`} onClick={() => changeQuantity(item.id, -1)}>−</button><span>{item.quantity}</span><button type="button" aria-label={`Add one ${item.name}`} onClick={() => changeQuantity(item.id, 1)}>+</button></div></div><button type="button" className="remove-item" aria-label={`Remove ${item.name} from cart`} onClick={() => setCart(items => items.filter(entry => entry.id !== item.id))}>×</button></div>)}</div><div className="cart-summary"><div><span>Subtotal</span><strong>{money.format(cartTotal)}</strong></div><p>Delivery and payment details will be added in the checkout step.</p><button type="button" onClick={() => { setCartOpen(false); setNotice('Checkout is coming in the next step.'); }}>Continue shopping</button></div></>}</aside></div>}
+    {cartOpen && <div className="cart-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setCartOpen(false); }}><aside className="cart-panel" aria-label="Shopping cart"><div className="cart-panel-head"><div><p className="eyebrow">YOUR LITTLE HAUL</p><h2>Your cart <span>({cartCount})</span></h2></div><button className="close-cart" type="button" aria-label="Close cart" onClick={() => setCartOpen(false)}>×</button></div>{cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">🛍️</span><h3>Your cart is waiting</h3><p>Add a few good finds and they’ll show up here.</p><button type="button" onClick={() => setCartOpen(false)}>Keep browsing</button></div> : <><div className="cart-items">{cart.map(item => <div className="cart-item" key={item.id}><div className={`cart-item-art art-${item.tone}`} aria-hidden="true">{item.icon}</div><div className="cart-item-copy"><b>{item.name}</b><span>{money.format(item.price)}</span><div className="quantity-control"><button type="button" aria-label={`Remove one ${item.name}`} onClick={() => changeQuantity(item.id, -1)}>−</button><span>{item.quantity}</span><button type="button" aria-label={`Add one ${item.name}`} onClick={() => changeQuantity(item.id, 1)}>+</button></div></div><button type="button" className="remove-item" aria-label={`Remove ${item.name} from cart`} onClick={() => setCart(items => items.filter(entry => entry.id !== item.id))}>×</button></div>)}</div><div className="cart-summary"><div><span>Subtotal</span><strong>{money.format(cartTotal)}</strong></div><p>Delivery details are collected securely at checkout.</p><button type="button" onClick={() => { setCartOpen(false); setCheckoutOpen(true); setOrderMessage(''); setOrderResult(null); }}>Go to checkout</button></div></>}</aside></div>}
+    {checkoutOpen && <div className="checkout-backdrop"><section className="checkout-panel" role="dialog" aria-modal="true" aria-labelledby="checkout-title"><header className="checkout-head"><div><p className="eyebrow">ALMOST YOURS</p><h2 id="checkout-title">Checkout</h2></div><button type="button" className="close-cart" aria-label="Close checkout" onClick={() => setCheckoutOpen(false)}>×</button></header>
+      {orderResult ? <div className="checkout-success"><span>✓</span><h3>Order placed</h3><p>Your order number is <b>{orderResult.id}</b>.</p><p>{orderResult.emailSent ? 'A confirmation email has been sent.' : 'Your order was saved. Email setup is still needed to send the confirmation.'}</p><button type="button" onClick={() => { setCheckoutOpen(false); setOrderResult(null); }}>Back to the shop</button></div> : <>
+        {!session?.user ? <div className="checkout-signin"><p>Sign in with Google to place your order and keep it connected to your account.</p><button type="button" onClick={handleGoogleSignIn}>Continue with Google</button></div> : <div className="checkout-user">Signed in as <b>{session.user.email}</b></div>}
+        <form className="checkout-form" onSubmit={submitOrder}><label>Your name<input required autoComplete="name" value={delivery.name} onChange={event => setDelivery({ ...delivery, name: event.target.value })} /></label><label>Phone number<input required type="tel" autoComplete="tel" value={delivery.phone} onChange={event => setDelivery({ ...delivery, phone: event.target.value })} /></label><label>Delivery address<textarea required rows="3" autoComplete="street-address" value={delivery.address} onChange={event => setDelivery({ ...delivery, address: event.target.value })} /></label><div className="checkout-total"><span>Order total</span><b>{money.format(cartTotal)}</b></div>{orderMessage && <p className="checkout-error" role="alert">{orderMessage}</p>}<button className="place-order" type="submit" disabled={orderBusy || cart.length === 0}>{orderBusy ? 'Placing order…' : 'Place order'}</button></form>
+      </>}
+    </section></div>}
   </>;
 }

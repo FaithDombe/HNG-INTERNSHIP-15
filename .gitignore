@@ -4,3 +4,6 @@ dist/
 local-data/
 __pycache__/
 *.py[cod]
+
+.env.local
+supabase/.temp/
